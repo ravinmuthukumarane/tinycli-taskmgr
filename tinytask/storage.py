@@ -2,7 +2,7 @@
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -50,13 +50,16 @@ class TaskStorage:
         return max(task['id'] for task in tasks) + 1
     
     def add_task(self, title: str, tags: Optional[List[str]] = None, 
-                 priority: str = "medium") -> Dict:
+                 priority: str = "medium", due_date: Optional[str] = None,
+                 note: Optional[str] = None) -> Dict:
         """Add a new task.
         
         Args:
             title: The task description
             tags: Optional list of tags
             priority: Priority level (low, medium, high)
+            due_date: Optional due date in YYYY-MM-DD format
+            note: Optional detailed notes
         
         Returns:
             The created task dictionary
@@ -68,6 +71,8 @@ class TaskStorage:
             'done': False,
             'tags': tags or [],
             'priority': priority,
+            'due_date': due_date,
+            'note': note,
             'created_at': datetime.now().isoformat(),
             'completed_at': None
         }
@@ -77,13 +82,15 @@ class TaskStorage:
     
     def get_tasks(self, show_done: bool = False, 
                   tag_filter: Optional[str] = None,
-                  priority_filter: Optional[str] = None) -> List[Dict]:
+                  priority_filter: Optional[str] = None,
+                  due_filter: Optional[str] = None) -> List[Dict]:
         """Get tasks with optional filtering.
         
         Args:
             show_done: Include completed tasks
             tag_filter: Filter by tag
             priority_filter: Filter by priority
+            due_filter: Filter by due date (overdue, today, upcoming)
         
         Returns:
             List of filtered tasks
@@ -101,6 +108,27 @@ class TaskStorage:
         # Filter by priority
         if priority_filter:
             tasks = [t for t in tasks if t.get('priority') == priority_filter]
+        
+        # Filter by due date
+        if due_filter:
+            today = date.today()
+            filtered = []
+            for task in tasks:
+                due_date = task.get('due_date')
+                if not due_date:
+                    continue
+                
+                try:
+                    task_date = date.fromisoformat(due_date)
+                    if due_filter == 'overdue' and task_date < today and not task['done']:
+                        filtered.append(task)
+                    elif due_filter == 'today' and task_date == today:
+                        filtered.append(task)
+                    elif due_filter == 'upcoming' and task_date > today:
+                        filtered.append(task)
+                except ValueError:
+                    continue
+            tasks = filtered
         
         return tasks
     
@@ -179,3 +207,98 @@ class TaskStorage:
     def get_all_tasks(self) -> List[Dict]:
         """Get all tasks including completed ones."""
         return self._read_tasks()
+    
+    def edit_task(self, task_id: int, title: Optional[str] = None,
+                  priority: Optional[str] = None, tags: Optional[List[str]] = None,
+                  due_date: Optional[str] = None, note: Optional[str] = None) -> Optional[Dict]:
+        """Edit a task's properties.
+        
+        Args:
+            task_id: The ID of the task to edit
+            title: New title (if provided)
+            priority: New priority (if provided)
+            tags: New tags list (if provided)
+            due_date: New due date (if provided)
+            note: New note (if provided)
+        
+        Returns:
+            The updated task, or None if not found
+        """
+        tasks = self._read_tasks()
+        for task in tasks:
+            if task['id'] == task_id:
+                if title is not None:
+                    task['title'] = title
+                if priority is not None:
+                    task['priority'] = priority
+                if tags is not None:
+                    task['tags'] = tags
+                if due_date is not None:
+                    task['due_date'] = due_date
+                if note is not None:
+                    task['note'] = note
+                self._write_tasks(tasks)
+                return task
+        return None
+    
+    def search_tasks(self, query: str) -> List[Dict]:
+        """Search tasks by keyword in title and notes.
+        
+        Args:
+            query: Search query string
+        
+        Returns:
+            List of matching tasks
+        """
+        tasks = self._read_tasks()
+        query_lower = query.lower()
+        results = []
+        
+        for task in tasks:
+            # Search in title
+            if query_lower in task['title'].lower():
+                results.append(task)
+                continue
+            
+            # Search in notes
+            note = task.get('note', '')
+            if note and query_lower in note.lower():
+                results.append(task)
+        
+        return results
+    
+    def archive_completed(self) -> int:
+        """Archive completed tasks to a separate file.
+        
+        Returns:
+            Number of tasks archived
+        """
+        tasks = self._read_tasks()
+        archive_path = self.storage_dir / "archive.json"
+        
+        # Read existing archive
+        if archive_path.exists():
+            try:
+                with open(archive_path, 'r', encoding='utf-8') as f:
+                    archived = json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                archived = []
+        else:
+            archived = []
+        
+        # Separate completed and pending tasks
+        completed = [t for t in tasks if t['done']]
+        pending = [t for t in tasks if not t['done']]
+        
+        # Add completed tasks to archive with archive timestamp
+        for task in completed:
+            task['archived_at'] = datetime.now().isoformat()
+            archived.append(task)
+        
+        # Write updated files
+        with open(archive_path, 'w', encoding='utf-8') as f:
+            json.dump(archived, f, indent=2, ensure_ascii=False)
+        
+        self._write_tasks(pending)
+        
+        return len(completed)

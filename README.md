@@ -7,7 +7,12 @@ A fast, local CLI task manager for personal productivity. Built with Python and 
 - ✅ **Simple & Fast**: Quick task management from your terminal
 - 🏷️ **Tags**: Organize tasks with multiple tags
 - 🎨 **Priorities**: Set priority levels (low, medium, high)
-- 🔍 **Filtering**: Filter tasks by tags and priority
+- � **Due Dates**: Set deadlines and track overdue tasks
+- 📝 **Notes**: Add detailed descriptions to tasks
+- ✏️ **Edit Tasks**: Modify existing tasks easily
+- 🔍 **Search**: Find tasks by keyword in titles and notes
+- 📦 **Archive**: Move completed tasks to archive file
+- �🔍 **Filtering**: Filter tasks by tags, priority, and due dates
 - 📊 **Statistics**: View task completion stats
 - 💾 **Export**: Export tasks to JSON or CSV
 - 🎨 **Beautiful Output**: Rich formatting with colors and tables
@@ -37,11 +42,20 @@ Now you can use the `task` command from anywhere!
 # Add your first task
 task add "Buy groceries" --tag personal --priority high
 
+# Add a task with due date and notes
+task add "Submit report" --due 2025-10-15 --note "Include Q3 figures"
+
 # List all tasks
 task list
 
 # Mark a task as done
 task done 1
+
+# Search for tasks
+task search "report"
+
+# Edit a task
+task edit 1 --priority high --due 2025-10-20
 
 # View statistics
 task stats
@@ -61,11 +75,21 @@ task add "Fix bug #123" --tag work --tag urgent
 # With priority
 task add "Call dentist" --priority high
 
-# Multiple tags and priority
-task add "Plan vacation" -t personal -t travel -p medium
+# With due date
+task add "Submit proposal" --due 2025-10-15
+
+# With notes
+task add "Team meeting" --note "Discuss Q4 roadmap and budget allocation"
+
+# Everything combined
+task add "Project deadline" -t work -t urgent -p high -d 2025-10-31 -n "Final deliverables"
 ```
 
-**Priority levels**: `low`, `medium` (default), `high`
+**Options:**
+- `--tag, -t`: Add tags (can use multiple times)
+- `--priority, -p`: Set priority (`low`, `medium`, `high`)
+- `--due, -d`: Set due date (YYYY-MM-DD format)
+- `--note, -n`: Add detailed notes
 
 ### 📋 List Tasks
 
@@ -82,9 +106,24 @@ task list --tag work
 # Filter by priority
 task list --priority high
 
+# Show only overdue tasks
+task list --overdue
+
+# Show tasks due today
+task list --today
+
+# Show upcoming tasks
+task list --upcoming
+
 # Combine filters
 task list --tag urgent --priority high --all
 ```
+
+**Due date indicators:**
+- 🔴 **Red + ⚠️**: Overdue tasks
+- 🟡 **Yellow + 📅**: Due today
+- 🟡 **Yellow**: Due within 3 days
+- 🔵 **Cyan**: Due later
 
 ### ✓ Mark as Done
 
@@ -94,6 +133,41 @@ task done 1
 
 # Mark as not done (reopen)
 task undone 1
+```
+
+### ✏️ Edit Tasks
+
+```bash
+# Change title
+task edit 1 --title "Updated task description"
+
+# Change priority
+task edit 1 --priority high
+
+# Set or update due date
+task edit 1 --due 2025-10-20
+
+# Add or update note
+task edit 1 --note "Additional important details"
+
+# Update tags (replaces existing tags)
+task edit 1 --tag work --tag urgent
+
+# Update multiple fields at once
+task edit 1 --priority high --due 2025-10-15 --tag critical
+```
+
+### 🔍 Search Tasks
+
+```bash
+# Search in task titles and notes
+task search "budget"
+
+# Search for meetings
+task search "meeting"
+
+# Any keyword search
+task search "report"
 ```
 
 ### 🏷️ Update Tags
@@ -106,7 +180,7 @@ task tag 1 work important
 task tag 1 ""
 ```
 
-### 🗑️ Delete Tasks
+### 🗑️ Delete & Archive Tasks
 
 ```bash
 # Delete a specific task (with confirmation)
@@ -115,12 +189,22 @@ task delete 1
 # Delete without confirmation
 task delete 1 --force
 
+# Archive completed tasks (moves to archive.json)
+task archive
+
+# Archive without confirmation
+task archive --force
+
 # Clear only completed tasks
 task clear --done
 
 # Clear all tasks
 task clear --force
 ```
+
+**Archive vs Clear:**
+- `archive`: Moves completed tasks to `~/.tinytask/archive.json` (preserves history)
+- `clear --done`: Permanently deletes completed tasks (no recovery)
 
 ### 💾 Export Tasks
 
@@ -145,9 +229,9 @@ task stats
 ```
 
 Shows:
-- Total tasks
-- Completion percentage
+- Total tasks and completion percentage
 - Pending tasks by priority
+- Due date breakdown (overdue, due today, upcoming)
 - All tags used
 
 ## 📁 Data Storage
@@ -161,10 +245,14 @@ Tasks are stored locally in `~/.tinytask/tasks.json`. Each task contains:
   "done": false,
   "tags": ["work", "urgent"],
   "priority": "high",
+  "due_date": "2025-10-15",
+  "note": "Additional details here",
   "created_at": "2025-10-07T10:30:00",
   "completed_at": null
 }
 ```
+
+Completed tasks can be archived to `~/.tinytask/archive.json` using the `task archive` command.
 
 ## 🎨 Priority Visualization
 
@@ -178,9 +266,14 @@ Tasks are displayed with visual indicators:
 
 1. **Quick workflow**: Add tasks throughout the day, then review with `task list`
 2. **Stay organized**: Use consistent tag names like `work`, `personal`, `urgent`
-3. **Weekly review**: Use `task list --all` to review completed tasks
-4. **Backup**: Export regularly with `task export --all`
-5. **Clean up**: Run `task clear --done` monthly to archive completed tasks
+3. **Track deadlines**: Use `task list --overdue` daily to stay on top of due dates
+4. **Detailed planning**: Add notes with `--note` for context you'll need later
+5. **Quick edits**: Use `task edit` to update tasks without recreating them
+6. **Find anything**: Use `task search` to quickly locate tasks by keyword
+7. **Weekly review**: Use `task list --all` to review completed tasks
+8. **Clean workspace**: Run `task archive` monthly to keep your active list focused
+9. **Backup**: Export regularly with `task export --all`
+10. **Priority focus**: Use `task list --priority high --overdue` to see urgent items
 
 ## 🛠️ Development
 
@@ -215,14 +308,31 @@ tinycli-taskmgr/
 ### Morning Routine
 
 ```bash
-# Add today's tasks
-task add "Review PRs" -t work -p high
-task add "Team standup" -t work -p high  
+# Add today's tasks with due dates
+task add "Review PRs" -t work -p high -d 2025-10-07
+task add "Team standup" -t work -p high -d 2025-10-07
 task add "Gym workout" -t personal -p medium
 task add "Read chapter 3" -t learning -p low
 
-# Check the list
-task list
+# Check what's urgent
+task list --overdue
+task list --today
+```
+
+### During the Day
+
+```bash
+# Found an urgent task
+task add "Fix production bug" -t work -p high -d 2025-10-07 -n "Error in payment processing"
+
+# Need to reschedule
+task edit 5 --due 2025-10-08
+
+# Add more context
+task edit 1 --note "Focus on backend PRs first"
+
+# Quick search
+task search "payment"
 ```
 
 ### End of Day
@@ -235,6 +345,9 @@ task done 2
 # See what's left
 task list
 
+# Check tomorrow's tasks
+task list --upcoming
+
 # View progress
 task stats
 ```
@@ -245,11 +358,15 @@ task stats
 # See everything you accomplished
 task list --all
 
+# Archive completed work
+task archive
+
 # Export for records
 task export --all --format json --output "week_$(date +%Y%m%d).json"
 
-# Clean up
-task clear --done
+# Plan next week
+task add "Sprint planning" -t work -p high -d 2025-10-14
+task add "1-on-1 with manager" -t work -d 2025-10-15 -n "Discuss Q4 goals"
 ```
 
 ## 🤝 Contributing
