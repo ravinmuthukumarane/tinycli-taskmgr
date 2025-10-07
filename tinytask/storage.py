@@ -1,0 +1,181 @@
+"""Storage module for managing tasks in JSON format."""
+
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional
+
+
+class TaskStorage:
+    """Handles reading and writing tasks to a JSON file."""
+    
+    def __init__(self, file_path: Optional[str] = None):
+        """Initialize the task storage.
+        
+        Args:
+            file_path: Path to the tasks file. Defaults to ~/.tinytask/tasks.json
+        """
+        if file_path is None:
+            home = Path.home()
+            self.storage_dir = home / ".tinytask"
+            self.storage_dir.mkdir(exist_ok=True)
+            self.file_path = self.storage_dir / "tasks.json"
+        else:
+            self.file_path = Path(file_path)
+            self.storage_dir = self.file_path.parent
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize file if it doesn't exist
+        if not self.file_path.exists():
+            self._write_tasks([])
+    
+    def _read_tasks(self) -> List[Dict]:
+        """Read all tasks from the JSON file."""
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return []
+    
+    def _write_tasks(self, tasks: List[Dict]) -> None:
+        """Write tasks to the JSON file."""
+        with open(self.file_path, 'w', encoding='utf-8') as f:
+            json.dump(tasks, f, indent=2, ensure_ascii=False)
+    
+    def _get_next_id(self, tasks: List[Dict]) -> int:
+        """Get the next available task ID."""
+        if not tasks:
+            return 1
+        return max(task['id'] for task in tasks) + 1
+    
+    def add_task(self, title: str, tags: Optional[List[str]] = None, 
+                 priority: str = "medium") -> Dict:
+        """Add a new task.
+        
+        Args:
+            title: The task description
+            tags: Optional list of tags
+            priority: Priority level (low, medium, high)
+        
+        Returns:
+            The created task dictionary
+        """
+        tasks = self._read_tasks()
+        task = {
+            'id': self._get_next_id(tasks),
+            'title': title,
+            'done': False,
+            'tags': tags or [],
+            'priority': priority,
+            'created_at': datetime.now().isoformat(),
+            'completed_at': None
+        }
+        tasks.append(task)
+        self._write_tasks(tasks)
+        return task
+    
+    def get_tasks(self, show_done: bool = False, 
+                  tag_filter: Optional[str] = None,
+                  priority_filter: Optional[str] = None) -> List[Dict]:
+        """Get tasks with optional filtering.
+        
+        Args:
+            show_done: Include completed tasks
+            tag_filter: Filter by tag
+            priority_filter: Filter by priority
+        
+        Returns:
+            List of filtered tasks
+        """
+        tasks = self._read_tasks()
+        
+        # Filter by completion status
+        if not show_done:
+            tasks = [t for t in tasks if not t['done']]
+        
+        # Filter by tag
+        if tag_filter:
+            tasks = [t for t in tasks if tag_filter in t.get('tags', [])]
+        
+        # Filter by priority
+        if priority_filter:
+            tasks = [t for t in tasks if t.get('priority') == priority_filter]
+        
+        return tasks
+    
+    def mark_done(self, task_id: int) -> Optional[Dict]:
+        """Mark a task as done.
+        
+        Args:
+            task_id: The ID of the task to mark as done
+        
+        Returns:
+            The updated task, or None if not found
+        """
+        tasks = self._read_tasks()
+        for task in tasks:
+            if task['id'] == task_id:
+                task['done'] = True
+                task['completed_at'] = datetime.now().isoformat()
+                self._write_tasks(tasks)
+                return task
+        return None
+    
+    def mark_undone(self, task_id: int) -> Optional[Dict]:
+        """Mark a task as not done.
+        
+        Args:
+            task_id: The ID of the task to mark as not done
+        
+        Returns:
+            The updated task, or None if not found
+        """
+        tasks = self._read_tasks()
+        for task in tasks:
+            if task['id'] == task_id:
+                task['done'] = False
+                task['completed_at'] = None
+                self._write_tasks(tasks)
+                return task
+        return None
+    
+    def delete_task(self, task_id: int) -> bool:
+        """Delete a task.
+        
+        Args:
+            task_id: The ID of the task to delete
+        
+        Returns:
+            True if deleted, False if not found
+        """
+        tasks = self._read_tasks()
+        original_length = len(tasks)
+        tasks = [t for t in tasks if t['id'] != task_id]
+        
+        if len(tasks) < original_length:
+            self._write_tasks(tasks)
+            return True
+        return False
+    
+    def update_task_tags(self, task_id: int, tags: List[str]) -> Optional[Dict]:
+        """Update tags for a task.
+        
+        Args:
+            task_id: The ID of the task
+            tags: New list of tags
+        
+        Returns:
+            The updated task, or None if not found
+        """
+        tasks = self._read_tasks()
+        for task in tasks:
+            if task['id'] == task_id:
+                task['tags'] = tags
+                self._write_tasks(tasks)
+                return task
+        return None
+    
+    def get_all_tasks(self) -> List[Dict]:
+        """Get all tasks including completed ones."""
+        return self._read_tasks()
