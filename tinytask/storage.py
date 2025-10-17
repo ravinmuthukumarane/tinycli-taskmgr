@@ -1,7 +1,14 @@
-"""Storage module for managing tasks in JSON format."""
+"""Storage module for managing tasks in JSON format.
+
+Also provides simple lifecycle helpers:
+- disable/enable: Put the CLI into a disabled state by creating/removing a
+    marker file. While disabled, most commands will refuse to run.
+- uninstall: Remove the data directory (e.g., ~/.tinytask).
+"""
 
 import json
 import os
+import shutil
 from datetime import datetime, date
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -29,6 +36,8 @@ class TaskStorage:
         # Initialize file if it doesn't exist
         if not self.file_path.exists():
             self._write_tasks([])
+
+        self._disabled_flag = self.storage_dir / ".disabled"
     
     def _read_tasks(self) -> List[Dict]:
         """Read all tasks from the JSON file."""
@@ -302,3 +311,43 @@ class TaskStorage:
         self._write_tasks(pending)
         
         return len(completed)
+
+    # --- Lifecycle helpers ---
+    def is_disabled(self) -> bool:
+        """Return True if the CLI is in a disabled state."""
+        return self._disabled_flag.exists()
+
+    def disable(self, reason: Optional[str] = None) -> None:
+        """Disable the CLI by creating a marker file.
+
+        Args:
+            reason: Optional reason text stored in the flag file for reference.
+        """
+        content = {
+            "disabled_at": datetime.now().isoformat(),
+            "reason": reason or "manually disabled",
+        }
+        with open(self._disabled_flag, "w", encoding="utf-8") as f:
+            json.dump(content, f, indent=2)
+
+    def enable(self) -> None:
+        """Enable the CLI by removing the disabled marker file (if present)."""
+        try:
+            if self._disabled_flag.exists():
+                self._disabled_flag.unlink()
+        except OSError:
+            # Non-fatal; leave as-is
+            pass
+
+    def uninstall(self) -> bool:
+        """Delete the entire storage directory (~/.tinytask).
+
+        Returns:
+            True if directory removed or didn't exist; False on failure.
+        """
+        try:
+            if self.storage_dir.exists() and self.storage_dir.is_dir():
+                shutil.rmtree(self.storage_dir)
+            return True
+        except Exception:
+            return False

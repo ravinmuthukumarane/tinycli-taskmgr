@@ -21,6 +21,25 @@ app = typer.Typer(
 console = Console()
 storage = TaskStorage()
 
+def _abort_if_disabled(ctx: typer.Context):
+    """Abort command execution if the app is disabled via storage flag.
+
+    We allow only lifecycle commands (start, uninstall) to run while disabled.
+    """
+    lifecycle_ok = {"start", "uninstall"}
+    invoked = ctx.invoked_subcommand
+    if storage.is_disabled() and invoked not in lifecycle_ok:
+        console.print("\n[red]The task manager is currently disabled (stopped).[/red]")
+        console.print("[dim]Run 'task start' to re-enable it, or 'task uninstall' to remove data.[/dim]\n")
+        raise typer.Exit(1)
+
+
+@app.callback(invoke_without_command=False)
+def main(ctx: typer.Context):
+    """Global pre-check for disabled state."""
+    _abort_if_disabled(ctx)
+
+
 # Priority colors
 PRIORITY_COLORS = {
     "low": "blue",
@@ -550,6 +569,58 @@ def stats():
     console.print()
     console.print(panel)
     console.print()
+
+
+# --- Lifecycle commands ---
+
+@app.command()
+def stop():
+    """Temporarily disable the CLI (safe stop)."""
+    if storage.is_disabled():
+        console.print("\n[yellow]The task manager is already stopped.[/yellow]\n")
+        return
+    storage.disable(reason="user stop command")
+    console.print("\n[green]✓[/green] Task manager stopped.\n")
+    console.print("[dim]To re-enable, run: task start[/dim]\n")
+
+
+@app.command()
+def start():
+    """Re-enable the CLI after a stop."""
+    if not storage.is_disabled():
+        console.print("\n[green]The task manager is already running.[/green]\n")
+        return
+    storage.enable()
+    console.print("\n[green]✓[/green] Task manager started.\n")
+
+
+@app.command()
+def uninstall(
+    purge: bool = typer.Option(False, "--purge", help="Remove all local data (~/.tinytask)"),
+    yes: bool = typer.Option(False, "-y", "--yes", help="Assume yes for prompts"),
+):
+    """Uninstall helper.
+
+    - With --purge, deletes local data directory (~/.tinytask).
+    - Prints instructions to uninstall the Python package itself.
+    """
+    # Purge data directory
+    if purge:
+        if not yes and not typer.confirm("This will delete ALL local data in ~/.tinytask. Continue?"):
+            console.print("\n[yellow]Cancelled[/yellow]\n")
+            raise typer.Abort()
+        ok = storage.uninstall()
+        if ok:
+            console.print("\n[green]✓[/green] Removed local data directory (~/.tinytask).\n")
+        else:
+            console.print("\n[red]❌ Failed to remove local data directory.[/red]\n")
+            raise typer.Exit(1)
+
+    # Always show package uninstall guidance (Windows PowerShell)
+    console.print("[bold]To remove the CLI package:[/bold]")
+    console.print("\n[dim]Run the following in Windows PowerShell:[/dim]")
+    console.print("\n    pip uninstall tinytask\n")
+    console.print("If you installed in editable mode from this repo, you can also just remove the folder or run the uninstall above.")
 
 
 def _display_task(task: dict):

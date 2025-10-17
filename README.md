@@ -7,12 +7,12 @@ A fast, local CLI task manager for personal productivity. Built with Python and 
 - ✅ **Simple & Fast**: Quick task management from your terminal
 - 🏷️ **Tags**: Organize tasks with multiple tags
 - 🎨 **Priorities**: Set priority levels (low, medium, high)
-- � **Due Dates**: Set deadlines and track overdue tasks
+- 📅 **Due Dates**: Set deadlines and track overdue tasks
 - 📝 **Notes**: Add detailed descriptions to tasks
 - ✏️ **Edit Tasks**: Modify existing tasks easily
 - 🔍 **Search**: Find tasks by keyword in titles and notes
 - 📦 **Archive**: Move completed tasks to archive file
-- �🔍 **Filtering**: Filter tasks by tags, priority, and due dates
+- � **Filtering**: Filter tasks by tags, priority, and due dates
 - 📊 **Statistics**: View task completion stats
 - 💾 **Export**: Export tasks to JSON or CSV
 - 🎨 **Beautiful Output**: Rich formatting with colors and tables
@@ -206,6 +206,33 @@ task clear --force
 - `archive`: Moves completed tasks to `~/.tinytask/archive.json` (preserves history)
 - `clear --done`: Permanently deletes completed tasks (no recovery)
 
+### ⏹️ Stop/Start and Uninstall
+
+You can temporarily disable the CLI, or remove its local data entirely.
+
+```powershell
+# Stop the CLI (disables all commands except start/uninstall)
+task stop
+
+# Start (re-enable) the CLI
+task start
+
+# Uninstall helper: remove local data and show package removal steps
+task uninstall --purge -y
+```
+
+What happens:
+- `task stop` creates a marker at `~/.tinytask/.disabled`. While present, regular
+  commands won't run and you'll be prompted to run `task start`.
+- `task start` removes that marker.
+- `task uninstall --purge` deletes the entire `~/.tinytask` directory (tasks.json,
+  archive.json, and the disabled marker). Use with caution.
+- To remove the CLI package itself, run in PowerShell:
+
+```powershell
+pip uninstall tinytask
+```
+
 ### 💾 Export Tasks
 
 ```bash
@@ -253,6 +280,9 @@ Tasks are stored locally in `~/.tinytask/tasks.json`. Each task contains:
 ```
 
 Completed tasks can be archived to `~/.tinytask/archive.json` using the `task archive` command.
+
+To wipe local data manually (same as `task uninstall --purge`): delete the
+`~/.tinytask` directory.
 
 ## 🎨 Priority Visualization
 
